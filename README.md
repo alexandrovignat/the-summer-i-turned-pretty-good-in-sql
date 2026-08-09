@@ -1,39 +1,34 @@
--- Создаем базу
-CREATE DATABASE IF NOT EXISTS performance_lab;
-USE performance_lab;
+# MySQL Performance Lab - Project 1miilion!!
 
--- Создаем таблицу логов (как будто это логи посещений сайта)
-CREATE TABLE user_logs (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    action_type VARCHAR(50) NOT NULL,
-    product_id INT,
-    price DECIMAL(10,2),
-    ip_address VARCHAR(45),
-    event_date DATETIME NOT NULL,
-    -- Индексов пока НЕТ, кроме PRIMARY KEY
-    UNIQUE KEY (id) -- это просто для формальности, не считается
-);
+## Описание проекта
 
--- Генерация 1 миллиона строк (запусти и иди пей чай 3 минуты)
-DELIMITER $$
-CREATE PROCEDURE InsertMillionRows()
-BEGIN
-    DECLARE i INT DEFAULT 0;
-    WHILE i < 1000000 DO
-        INSERT INTO user_logs (user_id, action_type, product_id, price, ip_address, event_date)
-        VALUES (
-            FLOOR(1 + RAND() * 10000),  -- user_id (всего 10к юзеров)
-            ELT(1 + FLOOR(RAND() * 4), 'view', 'click', 'purchase', 'add_to_cart'),
-            FLOOR(1 + RAND() * 5000),
-            ROUND(100 + RAND() * 9900, 2),
-            CONCAT(FLOOR(1 + RAND()*255), '.', FLOOR(1 + RAND()*255), '.', FLOOR(1 + RAND()*255), '.', FLOOR(1 + RAND()*255)),
-            DATE_SUB(NOW(), INTERVAL FLOOR(RAND() * 365) DAY)
-        );
-        SET i = i + 1;
-    END WHILE;
-END$$
-DELIMITER ;
+Этот проект создан для демонстрации навыков оптимизации производительности запросов в MySQL. 
 
--- Запускаем генерацию
-CALL InsertMillionRows();
+В рамках работы я:
+- Спроектировал таблицу для хранения логов пользовательских действий (1 млн строк)
+- Проанализировал выполнение сложного аналитического запроса с помощью `EXPLAIN`
+- Выявил проблему полного сканирования таблицы (Full Table Scan)
+- Спроектировал и применил покрывающий индекс (Covering Index)
+- Добился сокращения времени выполнения запроса с ~2.5 секунд до ~0.05 секунд
+
+## Технологии
+
+- MySQL 8.0
+- SQL (продвинутый уровень)
+- Индексы: составные, покрывающие, правило левого края
+
+## Сценарий задачи
+
+**Бизнес-запрос:**  
+Вывести топ-10 пользователей по количеству покупок товаров дороже 5 000 рублей за последние 30 дней.
+
+**Исходные данные:**  
+Таблица `user_logs` содержит 1 000 000 записей о действиях пользователей.
+
+**Проблема:**  
+Запрос выполнялся ~2.5 секунды из-за полного сканирования таблицы.
+
+**Решение:**  
+Создан покрывающий индекс:
+```sql
+CREATE INDEX idx_covering ON user_logs(action_type, price, event_date, user_id);
